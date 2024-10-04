@@ -1,8 +1,11 @@
+import io.github.dueris.kotlin.eclipse.gradle.minecraft.MinecraftVersion
+
 plugins {
     java
-    id("com.ncorti.kotlin.gradle.template.plugin")
+    id("io.github.dueris.eclipse.gradle") version "1.1.0-beta"
 }
 
-templateExampleConfig {
-    message.set("Just trying this gradle plugin...")
+eclipse {
+    minecraft.set(MinecraftVersion.MC1_21_1)
+    widenerPaths.set(files("test.accessWidener"))
 }

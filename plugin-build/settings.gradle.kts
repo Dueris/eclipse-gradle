@@ -31,6 +31,6 @@ develocity {
 	}
 }
 
-rootProject.name = ("com.ncorti.kotlin.gradle.template")
+rootProject.name = ("eclipse-gradle")
 
 include(":plugin")

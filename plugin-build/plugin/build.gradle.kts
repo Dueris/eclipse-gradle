@@ -9,6 +9,8 @@ plugins {
 dependencies {
     implementation(kotlin("stdlib"))
     implementation(gradleApi())
+    implementation("net.fabricmc:access-widener:2.1.0")
+    implementation("org.ow2.asm:asm-commons:9.4")
 
     testImplementation(libs.junit)
 }
@@ -41,6 +43,10 @@ gradlePlugin {
 gradlePlugin {
     website.set(property("WEBSITE").toString())
     vcsUrl.set(property("VCS_URL").toString())
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 // Use Detekt with type resolution for check
