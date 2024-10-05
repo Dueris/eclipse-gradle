@@ -31,6 +31,6 @@ develocity {
 	}
 }
 
-rootProject.name = ("eclipse-gradle")
+rootProject.name = "eclipse-gradle"
 
 include(":plugin")

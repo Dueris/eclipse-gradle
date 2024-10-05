@@ -1,6 +1,5 @@
 package io.github.dueris.kotlin.eclipse.gradle
 
-import io.github.dueris.kotlin.eclipse.gradle.minecraft.MinecraftVersion
 import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
@@ -13,5 +12,5 @@ abstract class EclipseExtension
         private val objects = project.objects
 
         val minecraft: Property<MinecraftVersion> = objects.property(MinecraftVersion::class.java)
-        val widenerPaths: Property<FileCollection> = objects.property(FileCollection::class.java)
+        val wideners: Property<FileCollection> = objects.property(FileCollection::class.java)
     }
