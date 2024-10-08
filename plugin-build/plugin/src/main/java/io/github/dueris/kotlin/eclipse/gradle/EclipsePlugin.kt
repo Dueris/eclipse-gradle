@@ -1,13 +1,14 @@
 package io.github.dueris.kotlin.eclipse.gradle
 
+import io.github.dueris.kotlin.eclipse.gradle.provider.ConfigurationProvider
+import io.github.dueris.kotlin.eclipse.gradle.provider.DependencyProvider
+import io.github.dueris.kotlin.eclipse.gradle.provider.RepositoryProvider
 import net.fabricmc.accesswidener.AccessWidener
 import net.fabricmc.accesswidener.AccessWidenerClassVisitor
 import net.fabricmc.accesswidener.AccessWidenerReader
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.type.ArtifactTypeDefinition
-import org.gradle.api.attributes.Attribute
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
@@ -25,14 +26,25 @@ const val EXTENSION_NAME = "eclipse"
 
 @Suppress("UnnecessaryAbstractClass")
 abstract class EclipsePlugin : Plugin<Project> {
+
+    companion object {
+        var EXTENSION: EclipseExtension? = null
+    }
+
     override fun apply(project: Project) {
         val eclipseExtension = project.extensions.create(EXTENSION_NAME, EclipseExtension::class.java, project)
+        EXTENSION = eclipseExtension
+        RepositoryProvider(project).apply { project.uri(it) }
+        ConfigurationProvider(project).apply()
+        DependencyProvider(project).apply()
 
         eclipseExtension.wideners.convention(project.files())
 
         project.afterEvaluate {
-            val widener = configureWideners(eclipseExtension, project)
-            operateWideners(project, eclipseExtension, widener)
+            operateWideners(
+                project, eclipseExtension,
+                configureWideners(eclipseExtension, project)
+            )
         }
     }
 
@@ -48,7 +60,7 @@ abstract class EclipsePlugin : Plugin<Project> {
             var resolvedFile: File? = null
             val currentOperating: Project = project.rootProject
 
-            currentOperating.allprojects { subproject ->
+            for (subproject in currentOperating.allprojects) {
                 val resourceDirs = listOf(
                     File(subproject.projectDir, "src/main/resources")
                 )
@@ -128,7 +140,8 @@ abstract class EclipsePlugin : Plugin<Project> {
         val md = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).use { fis ->
             DigestInputStream(fis, md).use { dis ->
-                while (dis.read(buffer) != -1) { /* DigestInputStream updates the digest automatically */ }
+                while (dis.read(buffer) != -1) { /* DigestInputStream updates the digest automatically */
+                }
             }
         }
         return md.digest()

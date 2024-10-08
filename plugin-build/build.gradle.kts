@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.versionCheck)
+    alias(libs.plugins.kotlindsl)
 }
 
 allprojects {
@@ -40,10 +41,6 @@ tasks.withType<Detekt>().configureEach {
         html.required.set(true)
         html.outputLocation.set(file("build/reports/detekt.html"))
     }
-}
-
-tasks.register("clean", Delete::class.java) {
-    delete(rootProject.layout.buildDirectory)
 }
 
 tasks.wrapper {
