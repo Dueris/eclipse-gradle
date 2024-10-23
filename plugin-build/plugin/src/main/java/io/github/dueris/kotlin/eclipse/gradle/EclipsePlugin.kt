@@ -94,33 +94,39 @@ abstract class EclipsePlugin : Plugin<Project> {
         widener: AccessWidener
     ) {
         val cloneOf: Set<Configuration> = project.configurations.toSet()
-        val input: File = cloneOf.asSequence().filter { c -> c.isCanBeResolved && c.isCanBeConsumed }
-            .flatMap { c -> c.resolve() }
-            .filter { it.extension == "jar" }
-            .filter { jar -> jar.absolutePath.contains("userdev-" + eclipseExtension.minecraft.get().stringed) }
+        val input: Pair<Configuration, File> = cloneOf.asSequence()
+            .filter { c -> c.isCanBeResolved && c.isCanBeConsumed }
+            .flatMap { c -> c.resolve().map { jar -> c to jar } }
+            .filter { (_, jar) -> jar.extension == "jar" }
+            .filter { (_, jar) -> jar.absolutePath.contains("userdev-" + eclipseExtension.minecraft.get().stringed) }
             .toSet().first()
 
         val targets = widener.targets.map { it.replace('.', '/') + ".class" }.toSet()
-        println(":running access transformer on ${input.nameWithoutExtension}...")
+        println(":running access transformer on ${input.second.nameWithoutExtension}...")
 
-        val inputJar = JarInputStream(input.inputStream())
+        val inputJar = JarInputStream(input.second.inputStream())
         val outputFile = File(
             project.rootDir.toPath().resolve("build").resolve("eclipse-cache").resolve("eclipse-widened-userdev.jar")
                 .toAbsolutePath().toString()
         )
-        if (!outputFile.exists()) {
-            outputFile.parentFile.mkdirs()
-            outputFile.createNewFile()
-        } else if (filesAreIdentical(input, outputFile)) {
-            println(":found cache to be identical, ignoring...")
-            return
-        }
 
-        widen(outputFile, inputJar, targets, widener)
-        if (!filesAreIdentical(outputFile, input)) {
-            println(":replacing paperweight configuration jar...")
-            replaceFile(outputFile, input)
-            println(":finished applying eclipse workspace to environment")
+        try {
+            if (!outputFile.exists()) {
+                outputFile.parentFile.mkdirs()
+                outputFile.createNewFile()
+            } else if (filesAreIdentical(input.second, outputFile)) {
+                println(":found cache to be identical, ignoring...")
+                return
+            }
+
+            widen(outputFile, inputJar, targets, widener)
+            if (!filesAreIdentical(outputFile, input.second)) {
+                println(":replacing paperweight configuration jar...")
+                replaceFile(outputFile, input.second)
+                println(":finished applying eclipse workspace to environment")
+            }
+        } catch (throwed: Throwable) {
+            error("An unexpected error occurred when building workspace, skipping..")
         }
     }
 
