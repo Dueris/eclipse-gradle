@@ -9,7 +9,7 @@ import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.kotlin.dsl.accessors.runtime.addDependencyTo
 
-class DependencyProvider(project: Project) {
+class DependencyProvider(private val project: Project) {
     private val dependencies: DependencyHandler = project.dependencies
     private val util: Util = Util()
 
@@ -24,6 +24,14 @@ class DependencyProvider(project: Project) {
         }
     }
 
+    fun addFile(dependencyNotation: String) {
+        this.dependencies.compileOnly(project.files(dependencyNotation))
+    }
+
+    fun compileOnly(dependencyNotation: String) {
+        this.dependencies.compileOnly(dependencyNotation)
+    }
+
     private fun DependencyHandler.implementation(dependencyNotation: Any): Dependency? =
         add("implementation", dependencyNotation)
 
@@ -33,6 +41,9 @@ class DependencyProvider(project: Project) {
     ): ExternalModuleDependency = addDependencyTo(
         this, "compileOnly", dependencyNotation, dependencyConfiguration
     )
+
+    private fun DependencyHandler.compileOnly(dependencyNotation: Any): Dependency? =
+        add("compileOnly", dependencyNotation)
 
     private fun <T : ModuleDependency> T.exclude(group: String? = null, module: String? = null): T =
         util.uncheckedCast(exclude(util.excludeMapFor(group, module)))

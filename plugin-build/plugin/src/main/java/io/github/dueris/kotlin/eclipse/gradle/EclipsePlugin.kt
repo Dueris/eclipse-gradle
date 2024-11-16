@@ -9,6 +9,9 @@ import net.fabricmc.accesswidener.AccessWidenerReader
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.PublishArtifact
+import org.gradle.api.internal.artifacts.dsl.ArtifactFile
+import org.gradle.internal.cc.base.logger
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
@@ -84,7 +87,6 @@ abstract class EclipsePlugin : Plugin<Project> {
             } ?: throw IllegalStateException("Widener file '${file.name}' not found in resources directories.")
 
         }
-        println(":found $c wideners to apply, applying...")
         return widener
     }
 
@@ -93,6 +95,7 @@ abstract class EclipsePlugin : Plugin<Project> {
         eclipseExtension: EclipseExtension,
         widener: AccessWidener
     ) {
+        // mojangMappedServer modification
         val cloneOf: Set<Configuration> = project.configurations.toSet()
         val input: Pair<Configuration, File> = cloneOf.asSequence()
             .filter { c -> c.isCanBeResolved && c.isCanBeConsumed }
@@ -100,9 +103,16 @@ abstract class EclipsePlugin : Plugin<Project> {
             .filter { (_, jar) -> jar.extension == "jar" }
             .filter { (_, jar) -> jar.absolutePath.contains("userdev-" + eclipseExtension.minecraft.get().stringed) }
             .toSet().first()
+        val d = DependencyProvider(project);
+        for (file in input.first.files) {
+            if (file.absolutePath == input.second.absolutePath) {
+                continue
+            } else {
+                d.addFile(file.absolutePath)
+            }
+        }
 
         val targets = widener.targets.map { it.replace('.', '/') + ".class" }.toSet()
-        println(":running access transformer on ${input.second.nameWithoutExtension}...")
 
         val inputJar = JarInputStream(input.second.inputStream())
         val outputFile = File(
@@ -110,23 +120,57 @@ abstract class EclipsePlugin : Plugin<Project> {
                 .toAbsolutePath().toString()
         )
 
-        try {
-            if (!outputFile.exists()) {
-                outputFile.parentFile.mkdirs()
-                outputFile.createNewFile()
-            } else if (filesAreIdentical(input.second, outputFile)) {
-                println(":found cache to be identical, ignoring...")
-                return
-            }
+        processMojmapServer(project, input, outputFile, inputJar, targets, widener)
 
-            widen(outputFile, inputJar, targets, widener)
-            if (!filesAreIdentical(outputFile, input.second)) {
-                println(":replacing paperweight configuration jar...")
-                replaceFile(outputFile, input.second)
-                println(":finished applying eclipse workspace to environment")
+        /* -- From paperweight userdev
+            depList += MavenArtifact(
+                "com.google.code.findbugs",
+                "jsr305",
+                "3.0.2"
+            )
+            depList += MavenArtifact(
+                "org.apache.logging.log4j",
+                "log4j-api",
+                "2.17.0"
+            )
+            depList += MavenArtifact(
+                "org.jetbrains",
+                "annotations",
+                "23.0.0"
+            )
+             */
+        d.addFile(outputFile.absolutePath)
+        d.compileOnly("com.google.code.findbugs:jsr305:3.0.2")
+        d.compileOnly("org.apache.logging.log4j:log4j-api:2.17.0")
+        d.compileOnly("org.jetbrains:annotations:23.0.0")
+    }
+
+    private fun processMojmapServer(
+        project: Project,
+        input: Pair<Configuration, File>,
+        outputFile: File,
+        inputJar: JarInputStream,
+        targets: Set<String>,
+        widener: AccessWidener
+    ) {
+        project.tasks.register("widenEclipseServer") {
+            doLast {
+                println(":running access transformer on ${input.second.nameWithoutExtension}...")
+                if (project.configurations.contains(input.first)) {
+                    project.configurations.remove(input.first)
+                    if (!outputFile.exists()) {
+                        outputFile.parentFile.mkdirs()
+                        outputFile.createNewFile()
+                    }
+
+                    widen(outputFile, inputJar, targets, widener)
+                }
             }
-        } catch (throwed: Throwable) {
-            error("An unexpected error occurred when building workspace, skipping..")
+        }
+        if (!outputFile.exists()) {
+            outputFile.parentFile.mkdirs()
+            outputFile.createNewFile()
+            widen(outputFile, inputJar, targets, widener)
         }
     }
 
@@ -146,8 +190,7 @@ abstract class EclipsePlugin : Plugin<Project> {
         val md = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).use { fis ->
             DigestInputStream(fis, md).use { dis ->
-                while (dis.read(buffer) != -1) { /* DigestInputStream updates the digest automatically */
-                }
+                while (dis.read(buffer) != -1) { /* DigestInputStream updates the digest automatically */ }
             }
         }
         return md.digest()
@@ -167,6 +210,7 @@ abstract class EclipsePlugin : Plugin<Project> {
                 outputJar.putNextEntry(ZipEntry(entry.name))
 
                 if (targets.contains(entry.name)) {
+                    logger.debug("Widening entry '{}'", entry.name)
                     outputJar.write(transformClass(widener, inputJar.readBytes()))
                 } else {
                     inputJar.copyTo(outputJar)
@@ -178,10 +222,6 @@ abstract class EclipsePlugin : Plugin<Project> {
             inputJar.close()
             outputJar.close()
         }
-    }
-
-    private fun replaceFile(source: File, target: File) {
-        Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
 
     private fun transformClass(widener: AccessWidener, bytes: ByteArray): ByteArray {
