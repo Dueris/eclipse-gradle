@@ -27,5 +27,4 @@ develocity {
 
 rootProject.name = "eclipse-gradle"
 
-include(":example")
 includeBuild("plugin-build")
