@@ -12,7 +12,6 @@ abstract class EclipseExtension
 constructor(project: Project) {
     private val objects = project.objects
 
-    val minecraft: Property<MinecraftVersion> = objects.property(MinecraftVersion::class.java)
+    val minecraft: Property<String> = objects.property(String::class.java)
     val wideners: Property<FileCollection> = objects.property(FileCollection::class.java)
-    val useInternal: Provider<Boolean> = objects.property(Boolean::class.java).orElse(false)
 }

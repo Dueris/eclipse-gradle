@@ -101,7 +101,7 @@ abstract class EclipsePlugin : Plugin<Project> {
             .filter { c -> c.isCanBeResolved && c.isCanBeConsumed }
             .flatMap { c -> c.resolve().map { jar -> c to jar } }
             .filter { (_, jar) -> jar.extension == "jar" }
-            .filter { (_, jar) -> jar.absolutePath.contains("userdev-" + eclipseExtension.minecraft.get().stringed) }
+            .filter { (_, jar) -> jar.absolutePath.contains("userdev-" + eclipseExtension.minecraft.get()) }
             .toSet().first()
         val d = DependencyProvider(project);
         for (file in input.first.files) {
