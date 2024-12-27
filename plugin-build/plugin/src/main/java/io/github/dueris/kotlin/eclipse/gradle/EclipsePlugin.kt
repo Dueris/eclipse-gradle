@@ -96,13 +96,46 @@ abstract class EclipsePlugin : Plugin<Project> {
         widener: AccessWidener
     ) {
         // mojangMappedServer modification
-        val cloneOf: Set<Configuration> = project.configurations.toSet()
-        val input: Pair<Configuration, File> = cloneOf.asSequence()
+        var rootProj: Project = project.rootProject
+        println("Found root project: $rootProj")
+        // Old paperweight check first
+        val cloneOf: Set<Configuration> = rootProj.configurations.toSet()
+        var setInput: Set<Pair<Configuration, File>> = cloneOf.asSequence()
             .filter { c -> c.isCanBeResolved && c.isCanBeConsumed }
-            .flatMap { c -> c.resolve().map { jar -> c to jar } }
-            .filter { (_, jar) -> jar.extension == "jar" }
+            .flatMap { c ->
+                c.resolve().map { jar -> c to jar }
+            }
+            .filter { (_, jar) ->
+                jar.extension == "jar"
+            }
             .filter { (_, jar) -> jar.absolutePath.contains("userdev-" + eclipseExtension.minecraft.get()) }
-            .toSet().first()
+            .toSet()
+        if (setInput.isEmpty()) {
+            val version: MinecraftVersion = MinecraftVersion.getFromString(eclipseExtension.minecraft.get())
+            if (version == MinecraftVersion.MC1_21_4 || version.major > 21 || (version.major == 21 && version.minor >= 4)) {
+                // Using paperweight 2.x.x
+                println("Detected paperweight 2.x.x, running through new source search")
+                setInput = cloneOf.asSequence()
+                    .filter { c -> c.isCanBeResolved && c.isCanBeConsumed }
+                    .flatMap { c ->
+                        c.resolve().map { jar -> c to jar }
+                    }
+                    .filter { (_, jar) ->
+                        jar.extension == "jar" && jar.nameWithoutExtension == "patchedSources"
+                    }
+                    .toSet()
+            } else {
+                println("Unable to locate paperweight jar, exiting widener")
+                return
+            }
+        }
+        if (setInput.isEmpty()) {
+            println("Unable to locate paperweight jar, exiting widener")
+            return
+        }
+        val input: Pair<Configuration, File> = setInput.first()
+        //C:\Users\jedim\.gradle\caches\
+        // paperweight-userdev\613081b689735a1c6be92857491be1a4773c6b9c71a65baf922ee4f718c54ed2\module\io.papermc.paper\dev-bundle\1.21.4-R0.1-SNAPSHOT\paperweight\setupCache
         val d = DependencyProvider(project);
         for (file in input.first.files) {
             if (file.absolutePath == input.second.absolutePath) {
